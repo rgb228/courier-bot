@@ -1,11 +1,14 @@
-﻿import aiosqlite
+import aiosqlite
 import os
 
+# Путь к базе данных внутри папки data
 DB_PATH = "data/leads.db"
+
+# Автоматически создаем папку data, если ее нет (для Render)
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
-        # Проверяем, есть ли колонка phone, если нет - добавляем (для старых баз)
         await db.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
