@@ -7,7 +7,6 @@ from app.config import BOT_TOKEN
 from app.database import init_db
 from app.handlers import user, admin
 
-# --- ини веб-сервер для Render ---
 async def handle(request):
     return web.Response(text="Bot is running!")
 
@@ -19,24 +18,28 @@ async def start_web_server():
     port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    print(f"еб-сервер запущен на порту {port}")
+    print(f"Веб-сервер запущен на порту {port}")
+
+async def start_bot():
+    bot = Bot(token=BOT_TOKEN)
+    dp = Dispatcher()
+    dp.include_router(admin.router)
+    dp.include_router(user.router)
+    print("Бот успешно запущен!")
+    await dp.start_polling(bot)
 
 async def main():
     logging.basicConfig(level=logging.INFO)
     await init_db()
     
-    asyncio.create_task(start_web_server())
-    
-    bot = Bot(token=BOT_TOKEN)
-    dp = Dispatcher()
-    dp.include_router(admin.router)
-    dp.include_router(user.router)
-    
-    print("от успешно запущен!")
-    await dp.start_polling(bot)
+    # Запускаем веб-сервер и бота как две параллельные задачи
+    await asyncio.gather(
+        start_web_server(),
+        start_bot()
+    )
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("от остановлен.")
+        print("Бот остановлен.")
