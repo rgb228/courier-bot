@@ -3,10 +3,15 @@ import logging
 import os
 from aiohttp import web
 from aiogram import Bot, Dispatcher
-from app.config import BOT_TOKEN
 from app.database import init_db
 from app.handlers import user, admin
 
+# Получаем токен из переменных окружения (Render передает их сюда)
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN не найден! Добавь его в Environment Variables на Render.")
+
+# --- Мини веб-сервер для Render ---
 async def handle(request):
     return web.Response(text="Bot is running!")
 
