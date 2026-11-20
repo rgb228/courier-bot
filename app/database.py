@@ -1,11 +1,7 @@
 import aiosqlite
-import os
 
-# Путь к базе данных внутри папки data
-DB_PATH = "data/leads.db"
-
-# Автоматически создаем папку data, если ее нет (для Render)
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+# Путь к базе данных в корне проекта (Render её точно увидит)
+DB_PATH = "leads.db"
 
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
@@ -22,7 +18,7 @@ async def init_db():
         try:
             await db.execute("ALTER TABLE users ADD COLUMN phone TEXT")
         except aiosqlite.OperationalError:
-            pass # Колонка уже существует
+            pass
         await db.commit()
 
 async def save_user(user_id, username, first_name):
