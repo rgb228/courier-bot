@@ -1,13 +1,20 @@
-import aiosqlite
+import asyncpg
+import os
+import asyncio
 
-# Путь к базе данных в корне проекта (Render её точно увидит)
-DB_PATH = "leads.db"
+# Render передает строку подключения в переменную DATABASE_URL
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Функция для получения пула соединений
+async def get_pool():
+    return await asyncpg.create_pool(DATABASE_URL)
 
 async def init_db():
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute('''
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute('''
             CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY,
+                user_id BIGINT PRIMARY KEY,
                 username TEXT,
                 first_name TEXT,
                 phone TEXT,
@@ -15,42 +22,43 @@ async def init_db():
                 date_joined TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        try:
-            await db.execute("ALTER TABLE users ADD COLUMN phone TEXT")
-        except aiosqlite.OperationalError:
-            pass
-        await db.commit()
+    await pool.close()
 
 async def save_user(user_id, username, first_name):
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "INSERT OR IGNORE INTO users (user_id, username, first_name) VALUES (?, ?, ?)",
-            (user_id, username, first_name)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO users (user_id, username, first_name) VALUES (, , ) ON CONFLICT (user_id) DO NOTHING",
+            user_id, username, first_name
         )
-        await db.commit()
+    await pool.close()
 
 async def save_phone(user_id, phone):
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("UPDATE users SET phone = ? WHERE user_id = ?", (phone, user_id))
-        await db.commit()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE users SET phone =  WHERE user_id = ", phone, user_id)
+    await pool.close()
 
 async def update_status(user_id, status):
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("UPDATE users SET status = ? WHERE user_id = ?", (status, user_id))
-        await db.commit()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE users SET status =  WHERE user_id = ", status, user_id)
+    await pool.close()
 
 async def get_users(status=None):
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
         if status:
-            cursor = await db.execute("SELECT user_id, username, first_name, phone, status FROM users WHERE status = ?", (status,))
+            rows = await conn.fetch("SELECT user_id, username, first_name, phone, status FROM users WHERE status = ", status)
         else:
-            cursor = await db.execute("SELECT user_id, username, first_name, phone, status FROM users")
-        return await cursor.fetchall()
+            rows = await conn.fetch("SELECT user_id, username, first_name, phone, status FROM users")
+    await pool.close()
+    return [tuple(row) for row in rows]
 
 async def get_stats():
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute("SELECT COUNT(*) FROM users")
-        total = (await cursor.fetchone())[0]
-        cursor = await db.execute("SELECT COUNT(*) FROM users WHERE status = 'registered'")
-        registered = (await cursor.fetchone())[0]
-        return total, registered
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        total = await conn.fetchval("SELECT COUNT(*) FROM users")
+        registered = await conn.fetchval("SELECT COUNT(*) FROM users WHERE status = 'registered'")
+    await pool.close()
+    return total, registered
